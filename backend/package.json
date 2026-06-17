@@ -1,15 +1,21 @@
 {
-  "name": "backend",
+  "name": "nerix-backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Nerix Security Audit Backend API",
+  "main": "server.js",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js",
+    "dev": "node --watch server.js"
   },
-  "keywords": [],
+  "keywords": [
+    "security",
+    "scanner",
+    "saas",
+    "nerix"
+  ],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
