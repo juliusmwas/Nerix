@@ -1,11 +1,12 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 
-import Home from "../pages/Home";
-import Login from "../pages/Login";
-import Register from "../pages/Register";
-import Scan from "../pages/Scan";
-import ScanDetails from "../pages/ScanDetails";
-import NotFound from "../pages/NotFound";
+import Navbar from "../components/Navbar";
+//import Home from "../pages/Home";
+//import Login from "../pages/Login";
+//import Register from "../pages/Register";
+//import Scan from "../pages/Scan";
+//import ScanDetails from "../pages/ScanDetails";
+//import NotFound from "../pages/NotFound";
 
 const isAuthenticated = () => {
   return localStorage.getItem("token");
@@ -19,11 +20,12 @@ export default function AppRoutes() {
   return (
     <Routes>
       {/* PUBLIC */}
-      <Route path="/" element={<Home />} />
+      <Route path="/" element={<Navbar />} />
+      {/*<Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
+      <Route path="/register" element={<Register />} /> */}
 
-      {/* PROTECTED */}
+      {/* PROTECTED 
       <Route
         path="/scan"
         element={
@@ -42,7 +44,7 @@ export default function AppRoutes() {
         }
       />
 
-      <Route path="*" element={<NotFound />} />
+      <Route path="*" element={<NotFound />} /> */}
     </Routes>
   );
 }
