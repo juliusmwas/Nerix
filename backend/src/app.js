@@ -3,14 +3,17 @@
  *
  * Responsibilities:
  * - Configure Express server
- * - Apply global middleware (security, CORS, JSON parsing)
+ * - Apply security middleware
+ * - Enable request parsing
+ * - Enable cookie-based authentication
  * - Mount API routes
- * - Define base API structure
+ * - Handle errors and unknown routes
  */
 
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import cookieParser from "cookie-parser";
 
 // Routes
 import authRoutes from "./routes/auth.routes.js";
@@ -21,8 +24,6 @@ const app = express();
  * =========================
  * SECURITY MIDDLEWARE
  * =========================
- * helmet() sets secure HTTP headers
- * to protect against common attacks
  */
 app.use(helmet());
 
@@ -30,36 +31,29 @@ app.use(helmet());
  * =========================
  * CORS CONFIGURATION
  * =========================
- * Allows frontend (React) to communicate with backend
+ * Allows frontend to communicate with backend securely
  */
 app.use(
   cors({
     origin: "http://localhost:5173",
-    credentials: true,
+    credentials: true, // IMPORTANT for cookies
   }),
 );
 
 /**
  * =========================
- * BODY PARSER
+ * PARSERS
  * =========================
- * Enables reading JSON request bodies
+ * Enable JSON body parsing
+ * Enable cookie parsing (CRITICAL for JWT auth)
  */
 app.use(express.json());
+app.use(cookieParser());
 
 /**
  * =========================
  * API ROUTES
  * =========================
- * All API routes are prefixed with /api
- */
-
-/**
- * AUTH ROUTES
- * Handles:
- * - Register
- * - Login (future)
- * - Logout (future)
  */
 app.use("/api/auth", authRoutes);
 
@@ -67,7 +61,6 @@ app.use("/api/auth", authRoutes);
  * =========================
  * HEALTH CHECK ROUTE
  * =========================
- * Used to confirm backend is running
  */
 app.get("/", (req, res) => {
   res.json({
@@ -80,7 +73,6 @@ app.get("/", (req, res) => {
  * =========================
  * GLOBAL 404 HANDLER
  * =========================
- * Handles unknown routes
  */
 app.use((req, res) => {
   res.status(404).json({
