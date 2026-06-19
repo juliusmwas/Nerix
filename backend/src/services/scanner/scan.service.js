@@ -1,26 +1,36 @@
 /**
- * Scan Service (Orchestrator) - Phase 2
+ * Scan Service (Orchestrator)
  *
  * Purpose:
  * - Acts as the central scanning engine
  * - Coordinates multiple security scanners:
  *   1. HTTP Headers Scanner (Phase 1)
  *   2. SSL/TLS Scanner (Phase 2)
+ *   3. DNS + Email Security Scanner (Phase 3)
  *
  * Flow:
- * Domain → HTTP Request → Headers Scan → SSL Scan → Merge Results → Return API Response
+ * Domain → HTTP Request → Headers Scan → SSL Scan → DNS Scan → Merge Results → Return API Response
  */
 
 import axios from "axios";
 
-// Phase 1 scanner
+// =========================
+// PHASE 1: HEADERS SCANNER
+// =========================
 import { scanHeaders } from "./headers.scan.js";
 
-// Phase 2 scanner
+// =========================
+// PHASE 2: SSL SCANNER
+// =========================
 import { scanSSL } from "./ssl.scan.js";
 
+// =========================
+// PHASE 3: DNS SCANNER
+// =========================
+import { scanDNS } from "./dns.scan.js";
+
 /**
- * Main scanning function
+ * Main scanning function (Orchestrator)
  */
 export async function scanDomain(domain) {
   try {
@@ -36,9 +46,9 @@ export async function scanDomain(domain) {
      * =========================
      * HTTP REQUEST (BASE LAYER)
      * =========================
-     * We fetch the domain to:
-     * - get HTTP status code
-     * - extract response headers
+     * Used to extract:
+     * - status code
+     * - response headers
      */
     const response = await axios.get(url, {
       timeout: 10000,
@@ -58,42 +68,62 @@ export async function scanDomain(domain) {
      * =========================
      * PHASE 2: SSL SCAN
      * =========================
-     * Runs TLS certificate analysis
      */
     const sslResult = await scanSSL(domain);
 
     /**
      * =========================
-     * MERGE RESULTS
+     * PHASE 3: DNS SCAN
      * =========================
-     * Combine all findings and score impacts
+     * IMPORTANT:
+     * DNS may fail independently → handled safely
      */
-    const findings = [...headerResult.findings, ...sslResult.issues];
-
-    const scoreImpact = headerResult.scoreImpact + sslResult.scoreImpact;
+    const dnsResult = await scanDNS(domain);
 
     /**
      * =========================
-     * FINAL OUTPUT
+     * MERGE FINDINGS
+     * =========================
+     * Combine all security issues
+     */
+    const findings = [
+      ...headerResult.findings,
+      ...sslResult.issues,
+      ...dnsResult.findings,
+    ];
+
+    /**
+     * =========================
+     * MERGE SCORE IMPACT
+     * =========================
+     * Total security penalty from all scanners
+     */
+    const scoreImpact =
+      headerResult.scoreImpact + sslResult.scoreImpact + dnsResult.scoreImpact;
+
+    /**
+     * =========================
+     * FINAL RESPONSE OBJECT
      * =========================
      */
     return {
       domain,
       status: response.status,
 
-      // raw data (useful for debugging / future expansion)
+      // raw HTTP response headers
       headers,
 
-      // security findings from all scanners
+      // security issues combined from all scanners
       findings,
 
-      // total security score impact from all modules
+      // total score adjustment
       scoreImpact,
 
-      // optional detailed breakdown (VERY useful later for UI)
+      // full breakdown for frontend analytics UI
       breakdown: {
         headers: headerResult,
         ssl: sslResult,
+        dns: dnsResult,
       },
     };
   } catch (error) {
@@ -101,7 +131,7 @@ export async function scanDomain(domain) {
      * =========================
      * ERROR HANDLING
      * =========================
-     * Ensures scanner never crashes the server
+     * Prevents backend crash on scan failure
      */
     throw new Error("Scan failed: " + error.message);
   }
