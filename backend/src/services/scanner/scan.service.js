@@ -3,14 +3,15 @@
  *
  * Purpose:
  * - Central security scanning engine
- * - Coordinates multiple scanners:
+ * - Coordinates all scanners:
  *   1. HTTP Headers Scanner (Phase 1)
  *   2. SSL/TLS Scanner (Phase 2)
  *   3. DNS + Email Security Scanner (Phase 3)
  *   4. Redirect Chain Scanner (Phase 4)
+ *   5. Vulnerability Heuristics Scanner (Phase 5)
  *
  * Flow:
- * Domain → HTTP Request → Headers → SSL → DNS → Redirects → Merge → Score → Response
+ * Domain → HTTP Request → Headers → SSL → DNS → Redirects → Vulnerability → Merge → Score → Response
  */
 
 import axios from "axios";
@@ -34,6 +35,11 @@ import { scanDNS } from "./dns.scan.js";
 // PHASE 4: REDIRECT SCANNER
 // =========================
 import { scanRedirects } from "./redirect.scan.js";
+
+// =========================
+// PHASE 5: VULNERABILITY SCANNER
+// =========================
+import { scanVulnerabilities } from "./vuln.scan.js";
 
 /**
  * Main scanning function (Orchestrator)
@@ -92,27 +98,38 @@ export async function scanDomain(domain) {
 
     /**
      * =========================
+     * PHASE 5: VULNERABILITY SCAN
+     * =========================
+     * Uses headers + combined context signals
+     */
+    const vulnResult = scanVulnerabilities(headers);
+
+    /**
+     * =========================
      * MERGE FINDINGS
      * =========================
-     * Combine all security issues
+     * Combine all security issues from all scanners
      */
     const findings = [
       ...headerResult.findings,
       ...sslResult.issues,
       ...dnsResult.findings,
       ...redirectResult.findings,
+      ...vulnResult.findings,
     ];
 
     /**
      * =========================
      * MERGE SCORE IMPACT
      * =========================
+     * Total security penalty from all modules
      */
     const scoreImpact =
       headerResult.scoreImpact +
       sslResult.scoreImpact +
       dnsResult.scoreImpact +
-      redirectResult.scoreImpact;
+      redirectResult.scoreImpact +
+      vulnResult.scoreImpact;
 
     /**
      * =========================
@@ -123,10 +140,10 @@ export async function scanDomain(domain) {
       domain,
       status: response.status,
 
-      // raw HTTP headers (debug + future analytics)
+      // raw HTTP headers (debug + analytics)
       headers,
 
-      // combined findings from all scanners
+      // all security findings combined
       findings,
 
       // total security score adjustment
@@ -136,15 +153,13 @@ export async function scanDomain(domain) {
        * =========================
        * FULL BREAKDOWN (UI READY)
        * =========================
-       * Used for frontend dashboards:
-       * - per module scoring
-       * - drill-down analysis
        */
       breakdown: {
         headers: headerResult,
         ssl: sslResult,
         dns: dnsResult,
         redirects: redirectResult,
+        vulnerabilities: vulnResult,
       },
     };
   } catch (error) {
