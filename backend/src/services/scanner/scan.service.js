@@ -2,14 +2,15 @@
  * Scan Service (Orchestrator)
  *
  * Purpose:
- * - Acts as the central scanning engine
- * - Coordinates multiple security scanners:
+ * - Central security scanning engine
+ * - Coordinates multiple scanners:
  *   1. HTTP Headers Scanner (Phase 1)
  *   2. SSL/TLS Scanner (Phase 2)
  *   3. DNS + Email Security Scanner (Phase 3)
+ *   4. Redirect Chain Scanner (Phase 4)
  *
  * Flow:
- * Domain → HTTP Request → Headers Scan → SSL Scan → DNS Scan → Merge Results → Return API Response
+ * Domain → HTTP Request → Headers → SSL → DNS → Redirects → Merge → Score → Response
  */
 
 import axios from "axios";
@@ -29,6 +30,11 @@ import { scanSSL } from "./ssl.scan.js";
 // =========================
 import { scanDNS } from "./dns.scan.js";
 
+// =========================
+// PHASE 4: REDIRECT SCANNER
+// =========================
+import { scanRedirects } from "./redirect.scan.js";
+
 /**
  * Main scanning function (Orchestrator)
  */
@@ -38,17 +44,16 @@ export async function scanDomain(domain) {
      * =========================
      * DOMAIN NORMALIZATION
      * =========================
-     * Ensures consistent URL format
      */
     const url = domain.startsWith("http") ? domain : `https://${domain}`;
 
     /**
      * =========================
-     * HTTP REQUEST (BASE LAYER)
+     * BASE HTTP REQUEST
      * =========================
-     * Used to extract:
+     * Used for:
      * - status code
-     * - response headers
+     * - headers extraction
      */
     const response = await axios.get(url, {
       timeout: 10000,
@@ -75,10 +80,15 @@ export async function scanDomain(domain) {
      * =========================
      * PHASE 3: DNS SCAN
      * =========================
-     * IMPORTANT:
-     * DNS may fail independently → handled safely
      */
     const dnsResult = await scanDNS(domain);
+
+    /**
+     * =========================
+     * PHASE 4: REDIRECT SCAN
+     * =========================
+     */
+    const redirectResult = await scanRedirects(domain);
 
     /**
      * =========================
@@ -90,16 +100,19 @@ export async function scanDomain(domain) {
       ...headerResult.findings,
       ...sslResult.issues,
       ...dnsResult.findings,
+      ...redirectResult.findings,
     ];
 
     /**
      * =========================
      * MERGE SCORE IMPACT
      * =========================
-     * Total security penalty from all scanners
      */
     const scoreImpact =
-      headerResult.scoreImpact + sslResult.scoreImpact + dnsResult.scoreImpact;
+      headerResult.scoreImpact +
+      sslResult.scoreImpact +
+      dnsResult.scoreImpact +
+      redirectResult.scoreImpact;
 
     /**
      * =========================
@@ -110,20 +123,28 @@ export async function scanDomain(domain) {
       domain,
       status: response.status,
 
-      // raw HTTP response headers
+      // raw HTTP headers (debug + future analytics)
       headers,
 
-      // security issues combined from all scanners
+      // combined findings from all scanners
       findings,
 
-      // total score adjustment
+      // total security score adjustment
       scoreImpact,
 
-      // full breakdown for frontend analytics UI
+      /**
+       * =========================
+       * FULL BREAKDOWN (UI READY)
+       * =========================
+       * Used for frontend dashboards:
+       * - per module scoring
+       * - drill-down analysis
+       */
       breakdown: {
         headers: headerResult,
         ssl: sslResult,
         dns: dnsResult,
+        redirects: redirectResult,
       },
     };
   } catch (error) {
@@ -131,7 +152,6 @@ export async function scanDomain(domain) {
      * =========================
      * ERROR HANDLING
      * =========================
-     * Prevents backend crash on scan failure
      */
     throw new Error("Scan failed: " + error.message);
   }
