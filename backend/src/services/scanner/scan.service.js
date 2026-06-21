@@ -3,46 +3,35 @@
  *
  * Purpose:
  * - Central security scanning engine
- * - Coordinates all scanners:
- *   1. HTTP Headers Scanner (Phase 1)
- *   2. SSL/TLS Scanner (Phase 2)
- *   3. DNS + Email Security Scanner (Phase 3)
- *   4. Redirect Chain Scanner (Phase 4)
- *   5. Vulnerability Heuristics Scanner (Phase 5)
+ * - Runs all scanners (Phase 1–5)
+ * - Uses centralized scoring engine (Phase 6)
  *
  * Flow:
- * Domain → HTTP Request → Headers → SSL → DNS → Redirects → Vulnerability → Merge → Score → Response
+ * Domain → Scan Layers → Findings → Score Engine → Grade → Response
  */
 
 import axios from "axios";
 
 // =========================
-// PHASE 1: HEADERS SCANNER
+// SCANNERS (PHASE 1–5)
 // =========================
 import { scanHeaders } from "./headers.scan.js";
-
-// =========================
-// PHASE 2: SSL SCANNER
-// =========================
 import { scanSSL } from "./ssl.scan.js";
-
-// =========================
-// PHASE 3: DNS SCANNER
-// =========================
 import { scanDNS } from "./dns.scan.js";
-
-// =========================
-// PHASE 4: REDIRECT SCANNER
-// =========================
 import { scanRedirects } from "./redirect.scan.js";
-
-// =========================
-// PHASE 5: VULNERABILITY SCANNER
-// =========================
 import { scanVulnerabilities } from "./vuln.scan.js";
 
+// =========================
+// SCORING ENGINE (PHASE 6)
+// =========================
+import {
+  calculateSecurityScore,
+  getSecurityGrade,
+  getRiskLabel,
+} from "../utils/score.engine.js";
+
 /**
- * Main scanning function (Orchestrator)
+ * Main scanning function
  */
 export async function scanDomain(domain) {
   try {
@@ -57,9 +46,6 @@ export async function scanDomain(domain) {
      * =========================
      * BASE HTTP REQUEST
      * =========================
-     * Used for:
-     * - status code
-     * - headers extraction
      */
     const response = await axios.get(url, {
       timeout: 10000,
@@ -70,45 +56,19 @@ export async function scanDomain(domain) {
 
     /**
      * =========================
-     * PHASE 1: HEADERS SCAN
+     * RUN ALL SCANNERS
      * =========================
      */
     const headerResult = scanHeaders(headers);
-
-    /**
-     * =========================
-     * PHASE 2: SSL SCAN
-     * =========================
-     */
     const sslResult = await scanSSL(domain);
-
-    /**
-     * =========================
-     * PHASE 3: DNS SCAN
-     * =========================
-     */
     const dnsResult = await scanDNS(domain);
-
-    /**
-     * =========================
-     * PHASE 4: REDIRECT SCAN
-     * =========================
-     */
     const redirectResult = await scanRedirects(domain);
-
-    /**
-     * =========================
-     * PHASE 5: VULNERABILITY SCAN
-     * =========================
-     * Uses headers + combined context signals
-     */
     const vulnResult = scanVulnerabilities(headers);
 
     /**
      * =========================
      * MERGE FINDINGS
      * =========================
-     * Combine all security issues from all scanners
      */
     const findings = [
       ...headerResult.findings,
@@ -120,40 +80,30 @@ export async function scanDomain(domain) {
 
     /**
      * =========================
-     * MERGE SCORE IMPACT
+     * PHASE 6: SCORING ENGINE
      * =========================
-     * Total security penalty from all modules
      */
-    const scoreImpact =
-      headerResult.scoreImpact +
-      sslResult.scoreImpact +
-      dnsResult.scoreImpact +
-      redirectResult.scoreImpact +
-      vulnResult.scoreImpact;
+    const score = calculateSecurityScore(findings);
+    const grade = getSecurityGrade(score);
+    const risk = getRiskLabel(grade);
 
     /**
      * =========================
-     * FINAL RESPONSE OBJECT
+     * FINAL RESPONSE
      * =========================
      */
     return {
       domain,
       status: response.status,
-
-      // raw HTTP headers (debug + analytics)
       headers,
 
-      // all security findings combined
       findings,
 
-      // total security score adjustment
-      scoreImpact,
+      // PHASE 6 OUTPUT
+      score,
+      grade,
+      risk,
 
-      /**
-       * =========================
-       * FULL BREAKDOWN (UI READY)
-       * =========================
-       */
       breakdown: {
         headers: headerResult,
         ssl: sslResult,
@@ -163,11 +113,6 @@ export async function scanDomain(domain) {
       },
     };
   } catch (error) {
-    /**
-     * =========================
-     * ERROR HANDLING
-     * =========================
-     */
     throw new Error("Scan failed: " + error.message);
   }
 }
