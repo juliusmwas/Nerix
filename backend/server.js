@@ -12,6 +12,7 @@ import app from "./src/app.js";
 import dotenv from "dotenv";
 import { pool } from "./src/config/db.js";
 import { createUsersTable } from "./src/models/user.model.js";
+import { createScansTable } from "./src/models/scan.model.js";
 
 // Load variables from .env
 dotenv.config();
@@ -42,6 +43,7 @@ async function startServer() {
      * Create required tables if they do not exist
      */
     await createUsersTable();
+    await createScansTable();
 
     console.log("✅ Database tables ready");
 

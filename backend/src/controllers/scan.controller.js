@@ -1,47 +1,43 @@
 /**
- * Scan Controller (Phase 1)
- *
- * Purpose:
- * - Acts as the HTTP interface for the scan system
- * - Receives domain input from frontend
- * - Calls scan service (core engine)
- * - Calculates final security score
- * - Returns structured scan results
- *
- * Flow:
- * Client → Controller → Scan Service → Score Engine → Response
- */
+
+* Scan Controller (Phase 2 - Database Persistence)
+*
+* Purpose:
+* * Executes scan engine
+* * Receives results
+* * Stores scan in PostgreSQL
+* * Returns persisted scan response
+*
+* Flow:
+* Client → Controller → Scan Service → DB Save → Response
+  */
 
 import { scanDomain } from "../services/scanner/scan.service.js";
-import { calculateScore } from "../utils/score.utils.js";
+import { createScan } from "../models/scan.model.js";
 
 /**
- * Run Security Scan
- *
- * Endpoint:
- * POST /api/scan
- *
- * Body:
- * {
- *   domain: "example.com"
- * }
- */
+
+* Run Security Scan
+*
+* Endpoint:
+* POST /api/scan
+  */
 export async function runScan(req, res) {
   try {
     /**
-     * =========================
-     * INPUT EXTRACTION
-     * =========================
-     * Extract domain from request body
-     */
+
+  * =========================
+  * INPUT EXTRACTION
+  * =========================
+    */
     const { domain } = req.body;
 
     /**
-     * =========================
-     * INPUT VALIDATION
-     * =========================
-     * Ensure domain is provided
-     */
+
+  * =========================
+  * VALIDATION
+  * =========================
+    */
     if (!domain) {
       return res.status(400).json({
         success: false,
@@ -50,46 +46,52 @@ export async function runScan(req, res) {
     }
 
     /**
-     * =========================
-     * CORE SCAN EXECUTION
-     * =========================
-     * Calls scan engine (service layer)
-     * - fetches domain
-     * - analyzes headers (Phase 1)
-     */
+
+  * 
+  * USER CONTEXT (TEMP)
+  * =========================
+  * Later replaced by auth middleware
+    */
+    const userId = req.user?.id || null;
+
+    /**
+
+  * =========================
+  * RUN SCAN ENGINE
+  * =========================
+    */
     const result = await scanDomain(domain);
 
     /**
-     * =========================
-     * SCORE CALCULATION
-     * =========================
-     * Converts scan findings into
-     * a numerical security score (0–100)
-     */
-    const score = calculateScore(result);
+
+  * =========================
+  * SAVE TO DATABASE
+  * =========================
+  * Persist scan result for history/dashboard
+    */
+    const savedScan = await createScan({
+      userId,
+      domain: result.domain,
+      score: result.score,
+      grade: result.grade,
+      risk: result.risk,
+      findings: result.findings,
+    });
 
     /**
-     * =========================
-     * RESPONSE STRUCTURE
-     * =========================
-     * Return standardized API response
-     */
+
+  * =========================
+  * RESPONSE
+  * =========================
+    */
     return res.json({
       success: true,
       data: {
-        domain: result.domain,
-        status: result.status,
-        score,
-        findings: result.findings,
+        scan: savedScan,
+        breakdown: result.breakdown,
       },
     });
   } catch (error) {
-    /**
-     * =========================
-     * ERROR HANDLING
-     * =========================
-     * Handles unexpected failures
-     */
     console.error("Scan Controller Error:", error);
 
     return res.status(500).json({
