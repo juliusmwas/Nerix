@@ -3,13 +3,13 @@
 * Scan Controller
 *
 * Purpose:
-* * Handles incoming scan requests
+* * Handles scan requests from authenticated users
 * * Executes scan engine
-* * Stores results in PostgreSQL
-* * Returns structured response
+* * Persists scan results to PostgreSQL
+* * Returns structured response for frontend
 *
 * Flow:
-* Client → Auth Middleware → Controller → Scan Service → DB → Response
+* Client → Auth Middleware → Controller → Scan Engine → DB → Response
   */
 
 import { scanDomain } from "../services/scanner/scan.service.js";
@@ -33,7 +33,7 @@ export async function runScan(req, res) {
     /**
 
   * =========================
-  * VALIDATION
+  * INPUT VALIDATION
   * =========================
     */
     if (!domain || typeof domain !== "string") {
@@ -46,17 +46,18 @@ export async function runScan(req, res) {
     /**
 
   * =========================
-  * AUTH USER (FROM MIDDLEWARE)
+  * AUTH USER (REQUIRED)
   * =========================
+  * Comes from auth.middleware.js
     */
-    if (!req.user) {
+    const user = req.user;
+
+    if (!user) {
       return res.status(401).json({
         success: false,
         message: "Unauthorized",
       });
     }
-
-    const userId = req.user.id;
 
     /**
 
@@ -69,14 +70,13 @@ export async function runScan(req, res) {
     /**
 
   * =========================
-  * VALIDATE SCAN RESULT
+  * SAFETY CHECK
   * =========================
-  * Prevents saving corrupted scan data
     */
-    if (!result) {
+    if (!result || !result.findings) {
       return res.status(500).json({
         success: false,
-        message: "Scan engine failed to return results",
+        message: "Scan engine failed",
       });
     }
 
@@ -87,7 +87,7 @@ export async function runScan(req, res) {
   * =========================
     */
     const savedScan = await createScan({
-      userId,
+      userId: user.id,
       domain: result.domain,
       score: result.score,
       grade: result.grade,
