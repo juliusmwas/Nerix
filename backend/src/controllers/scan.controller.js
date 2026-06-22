@@ -1,15 +1,15 @@
 /**
 
-* Scan Controller (Phase 2 - Database Persistence)
+* Scan Controller
 *
 * Purpose:
+* * Handles incoming scan requests
 * * Executes scan engine
-* * Receives results
-* * Stores scan in PostgreSQL
-* * Returns persisted scan response
+* * Stores results in PostgreSQL
+* * Returns structured response
 *
 * Flow:
-* Client → Controller → Scan Service → DB Save → Response
+* Client → Auth Middleware → Controller → Scan Service → DB → Response
   */
 
 import { scanDomain } from "../services/scanner/scan.service.js";
@@ -18,9 +18,7 @@ import { createScan } from "../models/scan.model.js";
 /**
 
 * Run Security Scan
-*
-* Endpoint:
-* POST /api/scan
+* Endpoint: POST /api/scan
   */
 export async function runScan(req, res) {
   try {
@@ -38,21 +36,27 @@ export async function runScan(req, res) {
   * VALIDATION
   * =========================
     */
-    if (!domain) {
+    if (!domain || typeof domain !== "string") {
       return res.status(400).json({
         success: false,
-        message: "Domain is required",
+        message: "Valid domain is required",
       });
     }
 
     /**
 
-  * 
-  * USER CONTEXT (TEMP)
   * =========================
-  * Later replaced by auth middleware
+  * AUTH USER (FROM MIDDLEWARE)
+  * =========================
     */
-    const userId = req.user?.id || null;
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const userId = req.user.id;
 
     /**
 
@@ -65,9 +69,22 @@ export async function runScan(req, res) {
     /**
 
   * =========================
+  * VALIDATE SCAN RESULT
+  * =========================
+  * Prevents saving corrupted scan data
+    */
+    if (!result) {
+      return res.status(500).json({
+        success: false,
+        message: "Scan engine failed to return results",
+      });
+    }
+
+    /**
+
+  * =========================
   * SAVE TO DATABASE
   * =========================
-  * Persist scan result for history/dashboard
     */
     const savedScan = await createScan({
       userId,
@@ -84,8 +101,9 @@ export async function runScan(req, res) {
   * RESPONSE
   * =========================
     */
-    return res.json({
+    return res.status(201).json({
       success: true,
+      message: "Scan completed successfully",
       data: {
         scan: savedScan,
         breakdown: result.breakdown,
