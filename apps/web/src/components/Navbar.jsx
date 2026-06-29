@@ -2,15 +2,17 @@ export default function Navbar() {
   return (
     <>
       {/*Navbar*/}
-      <div>
+      <div className=" rounded-sm flex items-center  bg-white shadow-sm w-full justify-between h-15">
         {/*Logo*/}
         <div>
-          <h1>Nerix</h1>
+          <h1 className="text-2xl lg:text-3xl  font-bold text-blue-600 px-2 lg:px-4">
+            Nerix.
+          </h1>
         </div>
 
         {/*navlinks*/}
         <div>
-          <ul>
+          <ul className="flex items-center gap-5 ">
             <li>
               <a href="#">Features</a>
             </li>
