@@ -1,30 +1,36 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 
-import Navbar from "../components/Navbar";
-//import Home from "../pages/Home";
+// Navigate
+
+import Homepage from "../pages/Homepage";
+import PublicLayout from "../layouts/PublicLayout";
 //import Login from "../pages/Login";
 //import Register from "../pages/Register";
 //import Scan from "../pages/Scan";
 //import ScanDetails from "../pages/ScanDetails";
 //import NotFound from "../pages/NotFound";
 
-const isAuthenticated = () => {
+{
+  /*const isAuthenticated = () => {
   return localStorage.getItem("token");
 };
 
 function ProtectedRoute({ children }) {
   return isAuthenticated() ? children : <Navigate to="/login" />;
+}*/
 }
 
 export default function AppRoutes() {
   return (
     <Routes>
       {/* PUBLIC */}
-      <Route path="/" element={<Navbar />} />
-      {/*<Route path="/" element={<Home />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} /> */}
+      <Route element={<PublicLayout />}>
+        <Route path="/" element={<Homepage />} />
 
+        {/* other public pages */}
+        {/* <Route path="/login" element={<Login />} /> */}
+        {/* <Route path="/register" element={<Register />} /> */}
+      </Route>
       {/* PROTECTED 
       <Route
         path="/scan"
