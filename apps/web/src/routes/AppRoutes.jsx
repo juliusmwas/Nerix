@@ -2,7 +2,7 @@ import { Routes, Route } from "react-router-dom";
 
 // Navigate
 
-import Homepage from "../pages/Homepage";
+import Homepage from "../Pages/Homepage";
 import PublicLayout from "../layouts/PublicLayout";
 //import Login from "../pages/Login";
 //import Register from "../pages/Register";
